@@ -12,6 +12,7 @@
 
 import random
 import typing
+import math
 
 
 # info is called when you create your Battlesnake on play.battlesnake.com
@@ -71,47 +72,79 @@ def move(game_state: typing.Dict) -> typing.Dict:
     board_width = game_state['board']['width']
     board_height = game_state['board']['height']
 
-    cell_right = my_head["x"] + 1
-    cell_left = my_head["x"] - 1
-    cell_up = my_head["y"] + 1
-    cell_down = my_head["y"] - 1
+    right = my_head["x"] + 1
+    left = my_head["x"] - 1
+    up = my_head["y"] + 1
+    down = my_head["y"] - 1
 
-    if cell_down < 0:
+    cell_up = {"x": my_head["x"], "y": up}
+    cell_down = {"x": my_head["x"], "y": down}
+    cell_left = {"x": left, "y": my_head["y"]}
+    cell_right = {"x": right, "y": my_head["y"]}
+
+    if down < 0:
       is_move_safe["down"] = False
       
-    if cell_left < 0:
+    if left < 0:
       is_move_safe["left"] = False
       
-    if cell_right >= board_width:
+    if right >= board_width:
       is_move_safe["right"] = False
       
-    if cell_up >= board_height:
+    if up >= board_height:
       is_move_safe["up"] = False
 
     # TODO: Step 2 - Prevent your Battlesnake from colliding with itself
     my_body = game_state['you']['body']
-
-    print(my_body)
-    """
-    if cell_down < 0:
-      is_move_safe["down"] = False
-      print(cell_down)
-      
-    elif cell_left < 0:
-      is_move_safe["left"] = False
-      print(cell_left)
-      
-    elif cell_right >= board_width:
-      is_move_safe["right"] = False
-      print(cell_right)
-      
-    elif cell_up >= board_height:
+    
+    if cell_up in my_body:
       is_move_safe["up"] = False
-      print(cell_up)
-    """
+
+    if cell_down in my_body:
+      is_move_safe["down"] = False
+
+    if cell_left in my_body:
+      is_move_safe["left"] = False
+
+    if cell_right in my_body:
+      is_move_safe["right"] = False
     
     # TODO: Step 3 - Prevent your Battlesnake from colliding with other Battlesnakes
-    # opponents = game_state['board']['snakes']
+    opponents = game_state['board']['snakes']
+    opponent_cells = []
+    opponent_body_cells = {}
+    opponent_head_cells = {}
+
+    safe_moves_counter = 0
+    for directions in is_move_safe:
+        if directions:
+          safe_moves_counter += 1
+  
+    for opponent in opponents:
+      for opponent_body_cell in opponent["body"]:
+        opponent_cells.append({"x": opponent_body_cell["x"], "y": opponent_body_cell["y"]})
+        opponent_body_cell.setdefault(opponent["id"], []).append({"x": opponent_body_cell["x"], "y": opponent_body_cell["y"]})
+      opponent_cells.append({"x" :opponent["head"]["x"], "y" :opponent["head"]["y"]})
+      opponent_head_cells[opponent["id"]] = {"x" :opponent["head"]["x"], "y" :opponent["head"]["y"]}
+      
+      """if safe_moves_counter > 1:
+        opponent_cells.append({"x" :opponent["head"]["x"] + 1, "y" :opponent["head"]["y"]})
+        opponent_cells.append({"x" :opponent["head"]["x"] - 1, "y" :opponent["head"]["y"]})
+        opponent_cells.append({"x" :opponent["head"]["x"], "y" :opponent["head"]["y"] + 1})
+        opponent_cells.append({"x" :opponent["head"]["x"], "y" :opponent["head"]["y"] - 1})"""
+
+
+    if cell_up in opponent_cells:
+      is_move_safe["up"] = False
+
+    if cell_down in opponent_cells:
+      is_move_safe["down"] = False
+
+    if cell_left in opponent_cells:
+      is_move_safe["left"] = False
+
+    if cell_right in opponent_cells:
+      is_move_safe["right"] = False
 
     # Are there any safe moves left?
     safe_moves = []
@@ -122,22 +155,55 @@ def move(game_state: typing.Dict) -> typing.Dict:
     if len(safe_moves) == 0:
         print(f"MOVE {game_state['turn']}: No safe moves detected! Moving down")
         return {"move": "down"}
+      
+    # TODO: Step 4 - Move towards food instead of random, to regain health and survive longer
+    foods = game_state['board']['food']
+    for food in foods:
+      food["distance"] = math.sqrt((food["x"] - my_head["x"])**2 + (food["y"] - my_head["y"])**2)
+    food_sorted_distance = sorted(foods, key=lambda d: d['distance'])
+    for food in food_sorted_distance:
+      in_between_x = []
+      in_between_y = []
+      if food["x"] > my_head["x"]:
+        x_step = -1
+      else:
+        x_step = 1
+      if food["y"] > my_head["y"]:
+        y_step = -1
+      else:
+        y_step = 1
+      for x in range(food["x"], my_head["x"], x_step):
+        in_between_x.append(x)
+      for y in range(food["y"] - my_head["y"], y_step):
+        in_between_y.append(y)
+      for x in in_between_x:
+        for y in in_between_y:
+          if {"x": x, "y": y} in opponent_cells:
+            food["danger"] = food.get("danger", 0) + 1
+      if food.get("danger", 0) == 0:
+        food["score"] = food["distance"]
+      else:
+        food["score"] = food["distance"] * 1/food["danger"]
+    preferred_foods = sorted(foods, key=lambda d: d["score"])
+    for food in preferred_foods:
+      if food["x"] < my_head["x"] and is_move_safe["left"]:
+        print("left")
+        return {"move": "left"}
+      if food["x"] > my_head["x"] and is_move_safe["right"]:
+        print("right")
+        return {"move": "right"}
+      if food["y"] < my_head["y"] and is_move_safe["down"]:
+        print("down")
+        return {"move": "down"}
+      if food["y"] > my_head["y"] and is_move_safe["up"]:
+        print("up")
+        return {"move": "up"}
+
 
     # Choose a random move from the safe ones
-    # Pathfind to actually get food?
-
-    #def fill_shortest_path(board, start, end, max_distance = math.inf):
-    #nboard = board.clone()
-    #nboard.clear_count(math.inf)
-      
     next_move = random.choice(safe_moves)
-
-    # TODO: Step 4 - Move towards food instead of random, to regain health and survive longer
-    # food = game_state['board']['food']
-
     print(f"MOVE {game_state['turn']}: {next_move}")
     return {"move": next_move}
-
 
 # Start server when `python main.py` is run
 if __name__ == "__main__":
