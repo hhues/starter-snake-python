@@ -76,24 +76,22 @@ def move(game_state: typing.Dict) -> typing.Dict:
     cell_up = my_head["y"] + 1
     cell_down = my_head["y"] - 1
 
-    print("up ", cell_up, ", down ", cell_down, ", left ",cell_left, ", right ", cell_right)
-    print(board_width, ", ", board_height)
-
     if cell_down < 0:
       is_move_safe["down"] = False
       
-    elif cell_left < 0:
+    if cell_left < 0:
       is_move_safe["left"] = False
       
-    elif cell_right >= board_width:
+    if cell_right >= board_width:
       is_move_safe["right"] = False
       
-    elif cell_up >= board_height:
+    if cell_up >= board_height:
       is_move_safe["up"] = False
 
     # TODO: Step 2 - Prevent your Battlesnake from colliding with itself
-    # my_body = game_state['you']['body']
-      
+    my_body = game_state['you']['body']
+
+    print(my_body)
     """
     if cell_down < 0:
       is_move_safe["down"] = False
